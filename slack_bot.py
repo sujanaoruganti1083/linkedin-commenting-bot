@@ -263,7 +263,14 @@ def update_message_error(channel: str, ts: str, reason: str):
         logger.error("Failed to update Slack message (error): %s", e)
 
 
-def open_edit_modal(trigger_id: str, comment_text: str, post_id: str, archetype: str):
+def open_edit_modal(
+    trigger_id: str,
+    comment_text: str,
+    post_id: str,
+    archetype: str,
+    channel: str = "",
+    message_ts: str = "",
+):
     client = get_client()
     label = ARCHETYPE_LABELS.get(archetype, archetype)
     modal = {
@@ -289,7 +296,12 @@ def open_edit_modal(trigger_id: str, comment_text: str, post_id: str, archetype:
                 "label": {"type": "plain_text", "text": "Your comment"},
             },
         ],
-        "private_metadata": json.dumps({"post_id": post_id, "archetype": archetype}),
+        "private_metadata": json.dumps({
+            "post_id": post_id,
+            "archetype": archetype,
+            "channel": channel,
+            "message_ts": message_ts,
+        }),
     }
     try:
         client.views_open(trigger_id=trigger_id, view=modal)

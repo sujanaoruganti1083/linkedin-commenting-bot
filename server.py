@@ -84,7 +84,7 @@ def _verify_slack_signature(raw_body: bytes, timestamp: str, signature: str) -> 
 
 
 def _handle_action(payload: dict):
-    """Process a block_actions payload in a background thread."""
+    """Process approve/skip block_actions in a background thread."""
     actions = payload.get("actions", [])
     if not actions:
         return
@@ -93,7 +93,6 @@ def _handle_action(payload: dict):
     action_id = action.get("action_id", "")
     channel = payload.get("channel", {}).get("id", config.SLACK_CHANNEL_ID)
     message_ts = payload.get("message", {}).get("ts", "")
-    trigger_id = payload.get("trigger_id", "")
 
     if action_id == "skip_post":
         post_id = action.get("value", "")
@@ -127,9 +126,6 @@ def _handle_action(payload: dict):
         else:
             slack_bot.update_message_error(channel, message_ts, msg)
 
-    elif action_id.startswith("edit_"):
-        slack_bot.open_edit_modal(trigger_id, comment_text, post_id, archetype)
-
 
 def _handle_view_submission(payload: dict):
     """Process a view_submission payload (edit modal) in a background thread."""
@@ -142,6 +138,8 @@ def _handle_view_submission(payload: dict):
 
     post_id = metadata.get("post_id", "")
     archetype = metadata.get("archetype", "")
+    channel = metadata.get("channel", config.SLACK_CHANNEL_ID)
+    message_ts = metadata.get("message_ts", "")
 
     values = payload.get("view", {}).get("state", {}).get("values", {})
     edited_comment = (
@@ -161,10 +159,13 @@ def _handle_view_submission(payload: dict):
         was_edited=True,
     )
     if success:
-        channel = config.SLACK_CHANNEL_ID
         logger.info("Edit+post succeeded for post %s", post_id)
+        if message_ts:
+            slack_bot.update_message_posted(channel, message_ts, archetype, was_edited=True)
     else:
         logger.error("Edit+post failed for post %s: %s", post_id, msg)
+        if message_ts:
+            slack_bot.update_message_error(channel, message_ts, msg)
 
 
 @app.route("/slack/actions", methods=["POST"])
@@ -185,8 +186,31 @@ def slack_actions():
     payload_type = payload.get("type")
 
     if payload_type == "block_actions":
-        thread = threading.Thread(target=_handle_action, args=(payload,), daemon=True)
-        thread.start()
+        actions = payload.get("actions", [])
+        action_id = actions[0].get("action_id", "") if actions else ""
+
+        if action_id.startswith("edit_"):
+            # Open modal synchronously — trigger_id expires 3s after this request
+            action = actions[0]
+            raw_value = action.get("value", "{}")
+            try:
+                value = json.loads(raw_value)
+            except json.JSONDecodeError:
+                abort(400)
+            channel = payload.get("channel", {}).get("id", config.SLACK_CHANNEL_ID)
+            message_ts = payload.get("message", {}).get("ts", "")
+            slack_bot.open_edit_modal(
+                trigger_id=payload.get("trigger_id", ""),
+                comment_text=value.get("comment", ""),
+                post_id=value.get("post_id", ""),
+                archetype=value.get("archetype", ""),
+                channel=channel,
+                message_ts=message_ts,
+            )
+        else:
+            thread = threading.Thread(target=_handle_action, args=(payload,), daemon=True)
+            thread.start()
+
         return "", 200
 
     if payload_type == "view_submission":
