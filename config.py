@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 LINKUP_API_KEY = os.getenv("LINKUP_API_KEY", "")
-LINKUP_LOGIN_TOKEN = os.getenv("LINKUP_LOGIN_TOKEN", "")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 

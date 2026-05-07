@@ -67,7 +67,6 @@ def post_comment(
             json={
                 "post_url": post_url,
                 "message": comment_text,
-                "login_token": config.LINKUP_LOGIN_TOKEN,
             },
             timeout=15,
         )
