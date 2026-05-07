@@ -204,11 +204,18 @@ def health():
 
 
 if __name__ == "__main__":
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", 5000)))
+    args = parser.parse_args()
+
     db.init_db()
     sched = scheduler.create_scheduler(run_pipeline)
     sched.start()
-    logger.info("Scheduler started. Running Flask server...")
+    logger.info("Scheduler started. Running Flask server on port %d...", args.port)
     try:
-        app.run(host="0.0.0.0", port=5000, debug=False)
+        app.run(host="0.0.0.0", port=args.port, debug=False)
     finally:
         sched.shutdown()
