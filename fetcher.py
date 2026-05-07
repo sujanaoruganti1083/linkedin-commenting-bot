@@ -1,6 +1,5 @@
 import hashlib
 import logging
-from datetime import datetime, timezone
 
 import requests
 
@@ -9,74 +8,110 @@ import db
 
 logger = logging.getLogger(__name__)
 
-LINKUP_POSTS_URL = "https://api.linkupapi.com/v1/profile/posts"
+LINKUP_FEED_URL = "https://api.linkupapi.com/v1/posts/feed"
+FEED_FETCH_SIZE = 50
 
 
-def _make_post_id(post_url: str) -> str:
-    return hashlib.sha256(post_url.encode()).hexdigest()[:16]
+def _make_post_id(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
-def fetch_posts_for_creator(creator: dict) -> list[dict]:
-    """Fetch recent posts for a single creator via LinkUp API."""
+def _build_creator_url_index() -> dict[str, dict]:
+    """Map normalised LinkedIn profile URL → creator dict + priority tier."""
+    index = {}
+    for tier in config.PRIORITY_ORDER:
+        for creator in config.CREATORS.get(tier, []):
+            normalised = creator["linkedin_url"].rstrip("/").lower()
+            index[normalised] = {"creator": creator, "priority": tier}
+    return index
+
+
+def _match_creator(actor_url: str, index: dict) -> dict | None:
+    if not actor_url:
+        return None
+    normalised = actor_url.rstrip("/").lower()
+    return index.get(normalised)
+
+
+def fetch_feed() -> list[dict]:
+    """Fetch the authenticated user's LinkedIn feed via LinkUp API."""
     try:
-        response = requests.get(
-            LINKUP_POSTS_URL,
-            headers={"x-api-key": config.LINKUP_API_KEY},
-            params={"linkedin_url": creator["linkedin_url"]},
-            timeout=15,
+        response = requests.post(
+            LINKUP_FEED_URL,
+            headers={
+                "x-api-key": config.LINKUP_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json={
+                "total_results": FEED_FETCH_SIZE,
+                "login_token": config.LINKUP_LOGIN_TOKEN,
+            },
+            timeout=20,
         )
         response.raise_for_status()
         data = response.json()
     except Exception as e:
-        logger.error("Failed to fetch posts for %s: %s", creator["name"], e)
+        logger.error("Failed to fetch LinkedIn feed: %s", e)
         return []
 
-    raw_posts = data if isinstance(data, list) else data.get("posts", [])
-    posts = []
-    for item in raw_posts:
-        post_url = item.get("url") or item.get("post_url") or ""
-        post_text = item.get("text") or item.get("content") or item.get("commentary") or ""
-        post_urn = item.get("urn") or item.get("post_urn") or item.get("id") or ""
-        if not post_text:
-            continue
-
-        post_id = _make_post_id(post_url or post_urn or post_text[:64])
-        posts.append(
-            {
-                "post_id": post_id,
-                "author": creator["name"],
-                "post_text": post_text,
-                "post_url": post_url,
-                "post_urn": post_urn,
-                "priority": _creator_priority(creator),
-            }
-        )
-    return posts
-
-
-def _creator_priority(creator: dict) -> str:
-    for tier in config.PRIORITY_ORDER:
-        for c in config.CREATORS.get(tier, []):
-            if c["linkedin_url"] == creator["linkedin_url"]:
-                return tier
-    return "medium_priority"
+    raw_feed = data.get("data", {}).get("Feed", [])
+    if not raw_feed and isinstance(data, list):
+        raw_feed = data
+    return raw_feed
 
 
 def run_fetch() -> list[dict]:
     """
-    Fetch new posts across all creators, filtered to ones not yet seen,
-    capped at MAX_POSTS_PER_RUN. Returns posts ready for comment generation.
+    Fetch the LinkedIn feed, filter to target creators (priority-ordered),
+    skip already-seen posts, and return up to MAX_POSTS_PER_RUN new posts.
     """
     db.init_db()
+    creator_index = _build_creator_url_index()
+    raw_feed = fetch_feed()
+
+    if not raw_feed:
+        logger.info("Feed returned no posts")
+        return []
+
+    # Collect candidates sorted by creator priority
+    buckets: dict[str, list[dict]] = {tier: [] for tier in config.PRIORITY_ORDER}
+
+    for item in raw_feed:
+        actor_url = (
+            item.get("actor", {}).get("linkedin_url", "")
+            or item.get("actor", {}).get("profile_url", "")
+            or item.get("author_url", "")
+        )
+        match = _match_creator(actor_url, creator_index)
+        if not match:
+            continue
+
+        post_url = item.get("url") or item.get("post_url") or ""
+        post_text = item.get("commentary") or item.get("text") or item.get("content") or ""
+        post_urn = item.get("urn") or item.get("id") or ""
+
+        if not post_text:
+            continue
+
+        post_id = _make_post_id(post_url or post_urn or post_text[:64])
+        if db.has_seen_post(post_id):
+            continue
+
+        buckets[match["priority"]].append(
+            {
+                "post_id": post_id,
+                "author": match["creator"]["name"],
+                "post_text": post_text,
+                "post_url": post_url,
+                "post_urn": post_urn,
+                "priority": match["priority"],
+            }
+        )
+
+    # Flatten in priority order, cap at MAX_POSTS_PER_RUN
     candidates = []
-
     for tier in config.PRIORITY_ORDER:
-        for creator in config.CREATORS.get(tier, []):
-            raw = fetch_posts_for_creator(creator)
-            for post in raw:
-                if not db.has_seen_post(post["post_id"]):
-                    candidates.append(post)
-
+        candidates.extend(buckets[tier])
         if len(candidates) >= config.MAX_POSTS_PER_RUN:
             break
 
