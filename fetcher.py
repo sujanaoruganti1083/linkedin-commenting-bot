@@ -49,6 +49,7 @@ def fetch_feed() -> list[dict]:
             json={
                 "account_id": config.LINKUP_ACCOUNT_ID,
                 "action": "get_feed",
+                "params": {"total_results": FEED_FETCH_SIZE},
             },
             timeout=20,
         )
@@ -61,6 +62,16 @@ def fetch_feed() -> list[dict]:
     raw_feed = data.get("data", {}).get("Feed", [])
     if not raw_feed and isinstance(data, list):
         raw_feed = data
+
+    logger.info("Feed returned %d posts (requested %d)", len(raw_feed), FEED_FETCH_SIZE)
+    for item in raw_feed:
+        actor_url = (
+            item.get("actor", {}).get("linkedin_url", "")
+            or item.get("actor", {}).get("profile_url", "")
+            or item.get("author_url", "")
+        )
+        logger.debug("  Feed post author URL: %s", actor_url or "(none)")
+
     return raw_feed
 
 
