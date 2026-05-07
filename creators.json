@@ -1,0 +1,21 @@
+{
+  "must_engage": [
+    {"name": "Aakash Gupta", "handle": "aagupta", "linkedin_url": "https://www.linkedin.com/in/aagupta/", "note": "#1 AI PM voice. His audience IS the target audience."},
+    {"name": "Lenny Rachitsky", "handle": "lennyrachitsky", "linkedin_url": "https://www.linkedin.com/in/lennyrachitsky/", "note": "Biggest PM newsletter/podcast."},
+    {"name": "Shreyas Doshi", "handle": "shreyasdoshi", "linkedin_url": "https://www.linkedin.com/in/shreyasdoshi/", "note": "Deep product thinking frameworks."},
+    {"name": "Allie K. Miller", "handle": "alliekmiller", "linkedin_url": "https://www.linkedin.com/in/alliekmiller/", "note": "Former Amazon AI leader."},
+    {"name": "Dr. Nancy Li", "handle": "drnancyli", "linkedin_url": "https://www.linkedin.com/in/drnancyli/", "note": "AI PM career coach."}
+  ],
+  "high_priority": [
+    {"name": "Pawel Huryn", "handle": "pawel-huryn", "linkedin_url": "https://www.linkedin.com/in/pawel-huryn/"},
+    {"name": "Brian Balfour", "handle": "bbalfour", "linkedin_url": "https://www.linkedin.com/in/bbalfour/"},
+    {"name": "Ruben Hassid", "handle": "rubenhassid", "linkedin_url": "https://www.linkedin.com/in/rubenhassid/"},
+    {"name": "Jackie Bavaro", "handle": "jackiebo", "linkedin_url": "https://www.linkedin.com/in/jackiebo/"}
+  ],
+  "medium_priority": [
+    {"name": "Ethan Mollick", "handle": "emollick", "linkedin_url": "https://www.linkedin.com/in/emollick/"},
+    {"name": "Andrew Ng", "handle": "andrewyng", "linkedin_url": "https://www.linkedin.com/in/andrewyng/"},
+    {"name": "Diego Granados", "handle": "diegogranados", "linkedin_url": "https://www.linkedin.com/in/diegogranados/"},
+    {"name": "Shyvee Shi", "handle": "shyvee-shi", "linkedin_url": "https://www.linkedin.com/in/shyvee-shi/"}
+  ]
+}
