@@ -32,6 +32,7 @@ def run_pipeline():
     posts = fetcher.run_fetch()
     if not posts:
         logger.info("No new posts found")
+        slack_bot.send_no_posts_message()
         return
 
     for post in posts:

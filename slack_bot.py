@@ -175,6 +175,23 @@ def build_approval_message(
     return {"blocks": blocks}
 
 
+def send_no_posts_message():
+    client = get_client()
+    try:
+        client.chat_postMessage(
+            channel=config.SLACK_CHANNEL_ID,
+            text="No new posts found",
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": ":mag: *No new posts found*"},
+                }
+            ],
+        )
+    except SlackApiError as e:
+        logger.error("Failed to send no-posts message: %s", e)
+
+
 def delete_pending_messages():
     """Delete all previously sent approval messages that are still pending."""
     client = get_client()
