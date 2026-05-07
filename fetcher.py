@@ -29,7 +29,7 @@ def _build_creator_url_index() -> dict[str, dict]:
 def _match_creator(actor_url: str, index: dict) -> dict | None:
     if not actor_url:
         return None
-    normalised = actor_url.rstrip("/").lower()
+    normalised = actor_url.split("?")[0].rstrip("/").lower()
     return index.get(normalised)
 
 
