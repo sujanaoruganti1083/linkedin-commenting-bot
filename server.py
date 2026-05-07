@@ -56,7 +56,19 @@ def run_pipeline():
 
 
 def _verify_slack_signature(raw_body: bytes, timestamp: str, signature: str) -> bool:
-    if abs(time.time() - float(timestamp)) > 300:
+    if not timestamp:
+        logger.warning("Slack signature check failed: missing timestamp")
+        return False
+    try:
+        age = abs(time.time() - float(timestamp))
+    except ValueError:
+        logger.warning("Slack signature check failed: invalid timestamp %r", timestamp)
+        return False
+    if age > 300:
+        logger.warning("Slack signature check failed: timestamp too old (%ds)", age)
+        return False
+    if not raw_body:
+        logger.warning("Slack signature check failed: empty request body")
         return False
     base = f"v0:{timestamp}:{raw_body.decode('utf-8')}"
     expected = "v0=" + hmac.new(
@@ -64,7 +76,10 @@ def _verify_slack_signature(raw_body: bytes, timestamp: str, signature: str) -> 
         base.encode(),
         hashlib.sha256,
     ).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    match = hmac.compare_digest(expected, signature)
+    if not match:
+        logger.warning("Slack signature mismatch — check SLACK_SIGNING_SECRET in .env")
+    return match
 
 
 def _handle_action(payload: dict):
@@ -153,7 +168,7 @@ def _handle_view_submission(payload: dict):
 
 @app.route("/slack/actions", methods=["POST"])
 def slack_actions():
-    raw_body = request.get_data()
+    raw_body = request.get_data(cache=True)
     timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
     signature = request.headers.get("X-Slack-Signature", "")
 
