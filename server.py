@@ -47,10 +47,11 @@ def run_pipeline():
 
         slack_bot.send_approval_message(
             post_author=post["author"],
-            post_snippet=post["post_text"],
+            post_text=post["post_text"],
             comments=comments,
             post_url=post["post_url"],
             post_id=post["post_id"],
+            author_headline=post.get("author_headline", ""),
         )
         logger.info("Sent Slack message for post %s by %s", post["post_id"], post["author"])
 

@@ -195,6 +195,12 @@ def _extract_candidates(raw_posts: list[dict], creator_index: dict, source: str)
             {
                 "post_id": post_id,
                 "author": match["creator"]["name"],
+                "author_headline": (
+                    item.get("actor", {}).get("headline", "")
+                    or item.get("actor", {}).get("subtitle", "")
+                    or item.get("actor", {}).get("title", "")
+                    or ""
+                ),
                 "post_text": post_text,
                 "post_url": post_url,
                 "post_urn": post_urn,
