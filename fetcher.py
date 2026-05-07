@@ -8,7 +8,7 @@ import db
 
 logger = logging.getLogger(__name__)
 
-LINKUP_FEED_URL = "https://api.linkupapi.com/v1/posts/feed"
+LINKUP_V2_URL = "https://api.linkupapi.com/v2/content"
 FEED_FETCH_SIZE = 50
 
 
@@ -33,18 +33,22 @@ def _match_creator(actor_url: str, index: dict) -> dict | None:
     return index.get(normalised)
 
 
+def _linkup_headers() -> dict:
+    return {
+        "x-api-key": config.LINKUP_API_KEY,
+        "Content-Type": "application/json",
+    }
+
+
 def fetch_feed() -> list[dict]:
-    """Fetch the authenticated user's LinkedIn feed via LinkUp API."""
+    """Fetch the authenticated user's LinkedIn feed via LinkUp V2 API."""
     try:
         response = requests.post(
-            LINKUP_FEED_URL,
-            headers={
-                "x-api-key": config.LINKUP_API_KEY,
-                "Content-Type": "application/json",
-            },
+            LINKUP_V2_URL,
+            headers=_linkup_headers(),
             json={
-                "total_results": FEED_FETCH_SIZE,
-                "login_token": config.LINKUP_LOGIN_TOKEN,
+                "account_id": config.LINKUP_ACCOUNT_ID,
+                "action": "get_feed",
             },
             timeout=20,
         )
@@ -73,7 +77,6 @@ def run_fetch() -> list[dict]:
         logger.info("Feed returned no posts")
         return []
 
-    # Collect candidates sorted by creator priority
     buckets: dict[str, list[dict]] = {tier: [] for tier in config.PRIORITY_ORDER}
 
     for item in raw_feed:
@@ -108,7 +111,6 @@ def run_fetch() -> list[dict]:
             }
         )
 
-    # Flatten in priority order, cap at MAX_POSTS_PER_RUN
     candidates = []
     for tier in config.PRIORITY_ORDER:
         candidates.extend(buckets[tier])

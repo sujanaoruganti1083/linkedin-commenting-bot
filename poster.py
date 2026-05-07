@@ -1,5 +1,4 @@
 import logging
-import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -9,12 +8,15 @@ import db
 
 logger = logging.getLogger(__name__)
 
-LINKUP_COMMENT_URL = "https://api.linkupapi.com/v1/posts/comment"
+LINKUP_V2_URL = "https://api.linkupapi.com/v2/content"
 SAME_AUTHOR_COOLDOWN_HOURS = 4
 
 
-class RateLimitError(Exception):
-    pass
+def _linkup_headers() -> dict:
+    return {
+        "x-api-key": config.LINKUP_API_KEY,
+        "Content-Type": "application/json",
+    }
 
 
 def check_rate_limits(author: str) -> tuple[bool, str]:
@@ -46,7 +48,7 @@ def post_comment(
     was_edited: bool = False,
 ) -> tuple[bool, str]:
     """
-    Posts a comment to LinkedIn via LinkUp API.
+    Posts a comment to LinkedIn via LinkUp V2 API.
     Returns (success, message).
     """
     post = db.get_post(post_id)
@@ -59,14 +61,15 @@ def post_comment(
 
     try:
         response = requests.post(
-            LINKUP_COMMENT_URL,
-            headers={
-                "x-api-key": config.LINKUP_API_KEY,
-                "Content-Type": "application/json",
-            },
+            LINKUP_V2_URL,
+            headers=_linkup_headers(),
             json={
-                "post_url": post_url,
-                "message": comment_text,
+                "account_id": config.LINKUP_ACCOUNT_ID,
+                "action": "comment",
+                "params": {
+                    "post_url": post_url,
+                    "message": comment_text,
+                },
             },
             timeout=15,
         )
