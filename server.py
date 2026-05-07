@@ -28,6 +28,7 @@ def run_pipeline():
     """Fetch posts, generate comments, and send to Slack for approval."""
     logger.info("Pipeline run started")
     db.init_db()
+    slack_bot.delete_pending_messages()
     posts = fetcher.run_fetch()
     if not posts:
         logger.info("No new posts found")
@@ -97,6 +98,7 @@ def _handle_action(payload: dict):
     if action_id == "skip_post":
         post_id = action.get("value", "")
         db.save_skipped_post(post_id)
+        db.remove_slack_message(message_ts)
         slack_bot.update_message_skipped(channel, message_ts)
         return
 
@@ -122,6 +124,7 @@ def _handle_action(payload: dict):
             was_edited=False,
         )
         if success:
+            db.remove_slack_message(message_ts)
             slack_bot.update_message_posted(channel, message_ts, archetype, was_edited=False)
         else:
             slack_bot.update_message_error(channel, message_ts, msg)
@@ -161,6 +164,7 @@ def _handle_view_submission(payload: dict):
     if success:
         logger.info("Edit+post succeeded for post %s", post_id)
         if message_ts:
+            db.remove_slack_message(message_ts)
             slack_bot.update_message_posted(channel, message_ts, archetype, was_edited=True)
     else:
         logger.error("Edit+post failed for post %s: %s", post_id, msg)

@@ -36,6 +36,13 @@ CREATE TABLE IF NOT EXISTS posts_skipped (
     post_id TEXT PRIMARY KEY REFERENCES posts_seen(post_id),
     skipped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS slack_messages (
+    ts TEXT PRIMARY KEY,
+    channel TEXT NOT NULL,
+    post_id TEXT,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -144,6 +151,32 @@ def get_post(post_id: str) -> dict | None:
             "SELECT * FROM posts_seen WHERE post_id = ?", (post_id,)
         ).fetchone()
         return dict(row) if row else None
+
+
+def save_slack_message(ts: str, channel: str, post_id: str):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO slack_messages (ts, channel, post_id) VALUES (?, ?, ?)",
+            (ts, channel, post_id),
+        )
+
+
+def get_pending_slack_messages() -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT ts, channel FROM slack_messages"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def remove_slack_message(ts: str):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM slack_messages WHERE ts = ?", (ts,))
+
+
+def clear_slack_messages():
+    with get_conn() as conn:
+        conn.execute("DELETE FROM slack_messages")
 
 
 def get_recent_history(limit: int = 10) -> list[dict]:

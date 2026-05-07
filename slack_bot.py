@@ -175,6 +175,20 @@ def build_approval_message(
     return {"blocks": blocks}
 
 
+def delete_pending_messages():
+    """Delete all previously sent approval messages that are still pending."""
+    client = get_client()
+    pending = db.get_pending_slack_messages()
+    for msg in pending:
+        try:
+            client.chat_delete(channel=msg["channel"], ts=msg["ts"])
+            logger.info("Deleted pending Slack message ts=%s", msg["ts"])
+        except SlackApiError as e:
+            logger.warning("Could not delete Slack message ts=%s: %s", msg["ts"], e)
+    if pending:
+        db.clear_slack_messages()
+
+
 def send_approval_message(
     post_author: str,
     post_text: str,
@@ -194,7 +208,9 @@ def send_approval_message(
             text=f"New post from {post_author}",  # fallback for notifications
             **payload,
         )
-        return result["ts"]
+        ts = result["ts"]
+        db.save_slack_message(ts, config.SLACK_CHANNEL_ID, post_id)
+        return ts
     except SlackApiError as e:
         logger.error("Failed to send Slack message: %s", e)
         return None
