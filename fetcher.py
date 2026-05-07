@@ -89,9 +89,8 @@ def _is_recent(item: dict, now: datetime) -> bool:
     """Return True if the post was published within POST_MAX_AGE_HOURS."""
     post_time = _extract_post_time(item)
     if post_time is None:
-        # Can't determine age — fall back to fetched_at (treat as recent)
-        logger.debug("Could not determine post time; treating as recent")
-        return True
+        logger.warning("Could not determine post time; skipping to avoid stale content")
+        return False
     age_hours = (now - post_time).total_seconds() / 3600
     return age_hours <= POST_MAX_AGE_HOURS
 
